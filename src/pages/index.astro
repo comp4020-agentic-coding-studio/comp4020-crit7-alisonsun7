@@ -1,8 +1,22 @@
 ---
-import { listMessages } from "../lib/db";
+import { listPrinters, listRecentReports } from "../lib/db";
+import { printerStatuses } from "../lib/schema";
 import "../styles.css";
 
-const messages = listMessages();
+const printers = listPrinters();
+const recent = listRecentReports();
+
+const STATUS_LABEL: Record<string, string> = {
+  ok: "OK",
+  low_paper: "Low paper",
+  low_toner: "Low toner",
+  jammed: "Jammed",
+  broken: "Broken",
+};
+
+function label(status: string | null) {
+  return status ? (STATUS_LABEL[status] ?? status) : "No reports yet";
+}
 ---
 
 <!doctype html>
@@ -14,39 +28,102 @@ const messages = listMessages();
   </head>
   <body>
     <nav aria-label="site">
-      <a href="/">Guestbook</a>
+      <a href="/">Printers</a>
       <a href="/readme/">About</a>
     </nav>
     <main>
-      <h1>Guestbook</h1>
+      <h1>Printer status</h1>
       <p>
-        A minimal full-stack starter: messages live in SQLite on the machine's
-        volume (state survives a reload and a redeploy), and new messages
-        appear in every open tab over a server-sent-events stream — open this
-        page twice and sign it in one. Replace all of this with your own
-        prototype.
+        Report what a printer actually has right now — out of paper, out of
+        toner, jammed, broken, or fine — so the next person doesn't find out
+        the hard way. Reports live in SQLite on the machine's volume (state
+        survives a reload and a redeploy), and a new one updates every open
+        tab over a server-sent-events stream.
       </p>
-      <form method="post" action="/api/messages">
-        <label for="body">Leave a message</label>
-        <input id="body" name="body" required maxlength="500" />
-        <button>Sign</button>
+
+      <ul id="printers">
+        {
+          printers.map((printer) => (
+            <li id={`printer-${printer.id}`} data-status={printer.status ?? ""}>
+              <strong>{printer.name}</strong> — {printer.location}
+              <span class="status-line">
+                {" "}
+                <span class="status-badge">{label(printer.status)}</span>
+                {printer.statusAt && <span class="status-note"> · {printer.statusAt} UTC</span>}
+                {printer.statusNote && <span class="status-note"> · {printer.statusNote}</span>}
+              </span>
+            </li>
+          ))
+        }
+      </ul>
+
+      <form method="post" action="/api/reports">
+        <label for="printerId">Printer</label>
+        <select id="printerId" name="printerId" required>
+          {
+            printers.map((printer) => (
+              <option value={printer.id}>
+                {printer.name} — {printer.location}
+              </option>
+            ))
+          }
+        </select>
+
+        <label for="status">Status</label>
+        <select id="status" name="status" required>
+          {printerStatuses.map((status) => <option value={status}>{label(status)}</option>)}
+        </select>
+
+        <label for="note">Note (optional)</label>
+        <input id="note" name="note" maxlength="280" placeholder="e.g. tray 2 empty" />
+
+        <button>Report</button>
       </form>
-      <ul id="messages">
-        {messages.map((message) => <li>{message.body}</li>)}
+
+      <h2>Recent reports</h2>
+      <ul id="reports">
+        {
+          recent.map((report) => (
+            <li>
+              <strong>{report.printerName}</strong> ({report.printerLocation}) — {label(report.status)}
+              {report.note && <> · {report.note}</>} · {report.createdAt} UTC
+            </li>
+          ))
+        }
       </ul>
     </main>
     <script>
-      // The live half of the demo: subscribe to the SSE stream and prepend
-      // messages as they arrive. The form itself needs none of this — its
-      // POST + redirect re-renders the submitting tab from SQLite; this
-      // stream is how every other tab finds out.
-      const list = document.querySelector("#messages");
+      // The live half of the app: subscribe to the SSE stream, prepend the
+      // new report to the feed, and update that printer's status badge in
+      // place. The form itself needs none of this — its POST + redirect
+      // re-renders the submitting tab from SQLite; this stream is how every
+      // other tab finds out.
+      const STATUS_LABEL: Record<string, string> = {
+        ok: "OK",
+        low_paper: "Low paper",
+        low_toner: "Low toner",
+        jammed: "Jammed",
+        broken: "Broken",
+      };
+
+      const reportList = document.querySelector("#reports");
       const source = new EventSource("/api/events");
       source.addEventListener("message", (event) => {
-        const message = JSON.parse(event.data);
+        const report = JSON.parse(event.data);
+        const label = STATUS_LABEL[report.status] ?? report.status;
+
         const item = document.createElement("li");
-        item.textContent = message.body;
-        list?.prepend(item);
+        const name = document.createElement("strong");
+        name.textContent = report.printerName;
+        item.append(name, ` (${report.printerLocation}) — ${label}`);
+        if (report.note) item.append(` · ${report.note}`);
+        item.append(` · ${report.createdAt} UTC`);
+        reportList?.prepend(item);
+
+        const printerLi = document.querySelector(`#printer-${report.printerId}`);
+        const badge = printerLi?.querySelector(".status-badge");
+        if (badge) badge.textContent = label;
+        if (printerLi instanceof HTMLElement) printerLi.dataset.status = report.status;
       });
     </script>
   </body>

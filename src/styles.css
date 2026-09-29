@@ -23,7 +23,8 @@ form {
   margin-block: 1.5rem;
 }
 
-input {
+input,
+select {
   flex: 1;
   min-width: 12rem;
   padding: 0.4rem 0.6rem;
@@ -35,6 +36,41 @@ button {
   font: inherit;
 }
 
-#messages {
+#printers,
+#reports {
   padding-inline-start: 1.2rem;
+}
+
+#printers li {
+  margin-block-end: 0.4rem;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: #e2e2e2;
+  font-size: 0.85em;
+}
+
+#printers li[data-status="ok"] .status-badge {
+  background: #d4f4dd;
+  color: #14532d;
+}
+
+#printers li[data-status="low_paper"] .status-badge,
+#printers li[data-status="low_toner"] .status-badge {
+  background: #fdf0c8;
+  color: #7c4a03;
+}
+
+#printers li[data-status="jammed"] .status-badge,
+#printers li[data-status="broken"] .status-badge {
+  background: #fbd5d5;
+  color: #7a1212;
+}
+
+.status-note {
+  color: #555;
+  font-size: 0.9em;
 }
