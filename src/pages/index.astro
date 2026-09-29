@@ -41,13 +41,16 @@ function label(status: string | null) {
         tab over a server-sent-events stream.
       </p>
 
+      <h2>Printers</h2>
       <ul id="printers">
         {
           printers.map((printer) => (
             <li id={`printer-${printer.id}`} data-status={printer.status ?? ""}>
+              <span aria-hidden="true" class="printer-icon">
+                🖨️
+              </span>
               <strong>{printer.name}</strong> — {printer.location}
               <span class="status-line">
-                {" "}
                 <span class="status-badge">{label(printer.status)}</span>
                 {printer.statusAt && <span class="status-note"> · {printer.statusAt} UTC</span>}
                 {printer.statusNote && <span class="status-note"> · {printer.statusNote}</span>}
@@ -58,24 +61,30 @@ function label(status: string | null) {
       </ul>
 
       <form method="post" action="/api/reports">
-        <label for="printerId">Printer</label>
-        <select id="printerId" name="printerId" required>
-          {
-            printers.map((printer) => (
-              <option value={printer.id}>
-                {printer.name} — {printer.location}
-              </option>
-            ))
-          }
-        </select>
+        <div class="field">
+          <label for="printerId">Printer</label>
+          <select id="printerId" name="printerId" required>
+            {
+              printers.map((printer) => (
+                <option value={printer.id}>
+                  {printer.name} — {printer.location}
+                </option>
+              ))
+            }
+          </select>
+        </div>
 
-        <label for="status">Status</label>
-        <select id="status" name="status" required>
-          {printerStatuses.map((status) => <option value={status}>{label(status)}</option>)}
-        </select>
+        <div class="field">
+          <label for="status">Status</label>
+          <select id="status" name="status" required>
+            {printerStatuses.map((status) => <option value={status}>{label(status)}</option>)}
+          </select>
+        </div>
 
-        <label for="note">Note (optional)</label>
-        <input id="note" name="note" maxlength="280" placeholder="e.g. tray 2 empty" />
+        <div class="field">
+          <label for="note">Note (optional)</label>
+          <input id="note" name="note" maxlength="280" placeholder="e.g. tray 2 empty" />
+        </div>
 
         <button>Report</button>
       </form>
@@ -84,7 +93,7 @@ function label(status: string | null) {
       <ul id="reports">
         {
           recent.map((report) => (
-            <li>
+            <li data-status={report.status}>
               <strong>{report.printerName}</strong> ({report.printerLocation}) — {label(report.status)}
               {report.note && <> · {report.note}</>} · {report.createdAt} UTC
             </li>
@@ -113,6 +122,7 @@ function label(status: string | null) {
         const label = STATUS_LABEL[report.status] ?? report.status;
 
         const item = document.createElement("li");
+        item.dataset.status = report.status;
         const name = document.createElement("strong");
         name.textContent = report.printerName;
         item.append(name, ` (${report.printerLocation}) — ${label}`);
@@ -122,7 +132,13 @@ function label(status: string | null) {
 
         const printerLi = document.querySelector(`#printer-${report.printerId}`);
         const badge = printerLi?.querySelector(".status-badge");
-        if (badge) badge.textContent = label;
+        if (badge) {
+          badge.textContent = label;
+          badge.classList.remove("pulse");
+          // force a reflow so the animation can retrigger on repeated updates
+          void (badge as HTMLElement).offsetWidth;
+          badge.classList.add("pulse");
+        }
         if (printerLi instanceof HTMLElement) printerLi.dataset.status = report.status;
       });
     </script>
